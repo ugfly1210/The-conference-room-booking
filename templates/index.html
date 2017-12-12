@@ -1,0 +1,203 @@
+{% load staticfiles %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>会议室预定</title>
+    <link rel="stylesheet" href="{% static 'plugins/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="https://at.alicdn.com/t/font_234130_nem7eskcrkpdgqfr.css">
+    <link rel="stylesheet" href="{% static 'plugins/schedule/schedule.css' %}">
+    <style>
+        #schedule-box {
+            position: absolute;
+            top: 43px;
+            background-color: white;
+            opacity: 0.7;
+            border-radius: 5px;
+        }
+
+        * {
+            font-family: "Comic Sans MS";
+            text-align: center;
+        }
+
+        th {
+            text-align: center;
+        }
+
+        td.chosen {
+            background-color: #66afe9;
+        }
+
+        td.chosen_gun {
+            background-color: #2b669a;
+        }
+
+        td.after_click {
+            background-color: #28a4c9;
+        }
+    </style>
+</head>
+<body>
+
+
+<div class="container">
+    <h1 class="text-center " style="margin: 50px;"><b>会议室预定</b></h1>
+    <div class="form-group col-lg-4 col-lg-offset-8">
+        <div class="col-lg-9">
+            <input type="text" class="form-control" id="date" placeholder="" style="height: 40px;text-align: center">
+            <div id='schedule-box' class="boxshaw pull-right"></div>
+        </div>
+        <button class="btn  btn-default col-lg-3 " style="height: 40px">预定</button>
+    </div>
+
+    <table class="table table-bordered">
+        <thead>
+        <tr>
+            <th>会议室</th>
+            {% for times in time_choices %}
+                <th>{{ times.1 }}</th>
+            {% endfor %}
+
+        </tr>
+        </thead>
+        <tbody id="tBody">
+
+        </tbody>
+    </table>
+</div>
+<script src="{% static 'js/jquery-1.12.4.min.js' %}"></script>
+<script src="{% static 'js/jquery.cookie.js' %}"></script>
+<script src="{% static 'plugins/schedule/schedule.js' %}"></script>
+<script>
+    var mySchedule = new Schedule({
+        el: '#schedule-box',
+        //date: '2018-9-20',
+        clickCb: function (y, m, d) {
+            console.log('66666');
+            document.querySelector('#date').value = y + '-' + m + '-' + d
+        },
+        nextMonthCb: function (y, m, d) {
+            document.querySelector('#date').value = y + '-' + m + '-' + d
+        },
+        nextYeayCb: function (y, m, d) {
+            document.querySelector('#date').value = y + '-' + m + '-' + d
+        },
+        prevMonthCb: function (y, m, d) {
+            document.querySelector('#date').value = y + '-' + m + '-' + d
+        },
+        prevYearCb: function (y, m, d) {
+            document.querySelector('#date').value = y + '-' + m + '-' + d
+        }
+    });
+</script>
+<script>
+    {#    隐藏显示插件#}
+    $(function () {
+        $("#date").val($(".today").html());
+        $("#schedule-box").hide();
+        $("#date").focus(function () {
+            $("#schedule-box").slideDown()
+        });
+        $(document).click(function () {
+            $("#schedule-box").slideUp()
+        });
+        $("#schedule-box,#date").click(function (event) {
+            event.stopPropagation();
+        });
+    })
+
+
+</script>
+
+
+<script>
+
+    $(function () {
+        getBookInfo($('#date').val());
+        console.log()
+    });
+
+    //获取预定信息
+    function getBookInfo(data) {
+        $.ajax({
+            url: '/booking/',
+            type: 'GET',
+            data: {'date': data},
+            success: function (arg) {
+                arg = JSON.parse(arg);
+                if (arg.status) {
+                    $.each(arg.data, function (i, item) {
+                        var tr = document.createElement('tr'); //创建tr标签
+                        $.each(item, function (j, v) {
+                            {#console.log('v===',v);#}
+                            //{title: "💩", attrs: {room_id: 3, book_time: 12}}
+                            var td = document.createElement('td');
+                            $(td).text(v.title);
+                            {#console.log(td)  //<td>喔</td>#}
+                            {#console.log(v.attrs)#}
+                            $.each(v.attrs, function (kk, vv) {
+                                $(td).attr(kk, vv);  //kk指的就是遍历所有的k,vv就是遍历所有的v
+                                {#console.log(td)#}
+                            });
+                            $(tr).append(td)
+                        });
+                        $('#tBody').append(tr)
+                    })
+                    /*
+                    <tr>
+                        <td>会议室名</td>
+                        <td></td>
+                        <td>会议室名</td>
+                    </tr>
+                    * */
+                }
+            }
+        })
+    }
+
+
+    //定义一个全局变量,用来存放增加删除的选项
+    POST_DATA = {
+        ADD: {},
+        DEL: {}
+    };
+
+    //给td绑定事件,让页面可以动起来,td在最初是没有的,所以事件绑定
+    //会议室名和非自己预定的 是不需要事件的.得点不动
+    // td下面的不仅拥有room_id属性,并且fuck不等于true的
+    $('#tBody').on('click', 'td[room_id][fuck!="true"]', function () {
+        var room_id = $(this).attr('room_id');
+        var book_time = $(this).attr('book_time');
+        if ($(this).hasClass('chosen')) {
+            $(this).removeClass('chosen');
+            $(this).empty().html('🤖');
+
+            if (POST_DATA.DEL[room_id]) {
+                POST_DATA.DEL[room_id].push(book_time)
+            } else {
+                POST_DATA.DEL[room_id] = [book_time]
+            }  // 这里DEL[room_id]对应的值应该是一个列表.例如{会议室1:[1,2]}
+        }
+
+        else if ($(this).hasClass('after_click')) {
+            $(this).removeClass('after_click');
+            // 在ADD中找到并删除.它是后来点击的,默认是没有的.能走到这说明是先点击后又取消的.所以ADD里面肯定有
+            var index = POST_DATA.ADD[room_id].indexOf(book_time);
+            if(index !== -1 ){POST_DATA.ADD[room_id].splice(index,1)}
+        }
+        else {
+            $(this).addClass('after_click');
+
+            if (POST_DATA.ADD[room_id]) {
+                POST_DATA.ADD[room_id].push(book_time)
+            } else {
+                POST_DATA.ADD[room_id] = [book_time]
+            }
+        }
+    })
+
+</script>
+
+</body>
+</html>
